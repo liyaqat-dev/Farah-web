@@ -35,11 +35,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'farah-portal-v2';
-const LOGO_URL = "https://res.cloudinary.com/dgf5rdk10/image/upload/v1775501645/image-removebg-preview_uuanuv.png";
+const LOGO_URL = "https://res.cloudinary.com/dgf5rdk10/image/upload/v1775534830/image-removebg-preview_yupixf.svg";
 
 // --- Cloudinary Config ---
 const CLOUDINARY_CLOUD_NAME = "dgf5rdk10";
-const CLOUDINARY_UPLOAD_PRESET = "ml_default"; // Using default unsigned preset
+const CLOUDINARY_API_KEY = "656794471353496";
+const CLOUDINARY_API_SECRET = "voU9AOVrwDMwALF9B5oZvihlM-E"; 
+const CLOUDINARY_UPLOAD_PRESET = "ml_default"; 
 
 // Identity of the Admin
 const ADMIN_NAME = "ADMIN";
@@ -49,6 +51,7 @@ const ADMIN_ADM_ID = "0000";
 const uploadToFileServer = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('api_key', CLOUDINARY_API_KEY);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   
   const response = await fetch(
@@ -56,7 +59,10 @@ const uploadToFileServer = async (file) => {
     { method: 'POST', body: formData }
   );
   
-  if (!response.ok) throw new Error('Upload failed');
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.error?.message || 'Upload failed');
+  }
   const data = await response.json();
   return data.secure_url;
 };
@@ -405,12 +411,12 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
   }
 
   return (
-    <div className="flex flex-col h-[65vh] bg-[#111] rounded-[2.5rem] border border-white/5 overflow-hidden">
+    <div className="flex flex-col h-[500px] max-h-[70vh] bg-[#111] rounded-[2.5rem] border border-white/5 overflow-hidden">
       <div className="p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
         <span className="text-[10px] font-black text-[#d4af37] uppercase">{isAdmin ? `Chat with ${selectedChatUser.name}` : "Admin Support"}</span>
         {isAdmin && <button onClick={() => setSelectedChatUser(null)} className="text-gray-500 hover:text-white"><X size={18}/></button>}
       </div>
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         {messages.map(m => (
           <div key={m.id} className={`flex ${m.uid === user.uid ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-4 rounded-3xl ${m.uid === user.uid ? 'bg-[#d4af37] text-black rounded-tr-none' : 'bg-white/10 text-white rounded-tl-none'}`}>
@@ -425,20 +431,22 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
           </div>
         ))}
       </div>
-      <form onSubmit={send} className="p-4 bg-black/40 space-y-2">
+      <form onSubmit={send} className="p-3 md:p-4 bg-black/40 space-y-2 border-t border-white/5">
         {fileUrl && (
           <div className="flex items-center justify-between bg-[#d4af37]/10 p-2 rounded-xl">
              <span className="text-[10px] text-[#d4af37] font-bold">File Attached</span>
              <button type="button" onClick={() => setFileUrl("")}><X size={14} className="text-red-500"/></button>
           </div>
         )}
-        <div className="flex gap-2">
-          <button type="button" onClick={() => fileInputRef.current.click()} className="p-4 bg-white/5 rounded-2xl text-gray-400 hover:text-[#d4af37]">
+        <div className="flex gap-2 items-center">
+          <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 md:p-4 bg-white/5 rounded-2xl text-gray-400 hover:text-[#d4af37] flex-shrink-0">
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
           </button>
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
-          <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Message..." className="flex-1 bg-black border border-white/10 rounded-2xl px-5 text-sm outline-none focus:border-[#d4af37]" />
-          <button type="submit" className="bg-[#d4af37] text-black p-4 rounded-2xl"><Send size={18} /></button>
+          <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Message..." className="flex-1 bg-black border border-white/10 rounded-2xl px-4 py-3 md:px-5 md:py-4 text-sm outline-none focus:border-[#d4af37] w-full min-w-0" />
+          <button type="submit" className="bg-[#d4af37] text-black p-3 md:p-4 rounded-2xl flex-shrink-0 shadow-lg shadow-[#d4af37]/20">
+            <Send size={18} />
+          </button>
         </div>
       </form>
     </div>
@@ -549,5 +557,4 @@ function AddHighlightForm() {
     </form>
   );
 }
-
 
