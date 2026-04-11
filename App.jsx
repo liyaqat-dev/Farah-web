@@ -48,14 +48,14 @@ const ADMIN_ADM_ID = "0000";
 
 // --- Global Helpers ---
 const uploadToFileServer = async (fileInput) => {
-  const fileToUpload = fileInput instanceof FileList ? fileInput : fileInput;
+  const fileToUpload = fileInput instanceof FileList ? fileInput[0] : fileInput;
   if (!fileToUpload) throw new Error("No file selected");
   const formData = new FormData();
   formData.append('file', fileToUpload);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   let resourceType = "auto"; 
-  if (fileToUpload.type.startsWith("image/")) resourceType = "image";
-  else if (fileToUpload.type.startsWith("video/")) resourceType = "video";
+  if (fileToUpload.type && fileToUpload.type.startsWith("image/")) resourceType = "image";
+  else if (fileToUpload.type && fileToUpload.type.startsWith("video/")) resourceType = "video";
   const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { method: 'POST', body: formData });
   const data = await response.json();
   return data.secure_url;
@@ -193,7 +193,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <div className="fixed bottom-6 left-0 w-full px-6 flex justify-center z-">
+      <div className="fixed bottom-6 left-0 w-full px-6 flex justify-center z-50">
         <nav className="w-full max-w-md bg-[#111]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-2 flex justify-between items-center shadow-2xl">
           <NavIcon icon={<Home size={20} />} label="Home" active={currentPage === 'home'} onClick={() => setCurrentPage('home')} />
           <NavIcon icon={<Layout size={20} />} label="Gallery" active={currentPage === 'highlights'} onClick={() => setCurrentPage('highlights')} />
@@ -225,12 +225,14 @@ function NavIcon({ icon, label, active, onClick }) {
 
 function BlogSection({ blogs, isAdmin }) {
   const [showForm, setShowForm] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'blogs'), { title: fd.get('title'), category: fd.get('category'), author: fd.get('author'), content: fd.get('content'), status: 'pending', createdAt: serverTimestamp() });
     e.target.reset(); setShowForm(false);
   };
+
   return (
     <div className="space-y-6">
       <button onClick={() => setShowForm(!showForm)} className="w-full py-4 border-2 border-dashed border-[#d4af37]/30 rounded-3xl flex items-center justify-center gap-3 text-[#d4af37] font-black">{showForm ? <X size={20} /> : <Plus size={20} />} New Post</button>
@@ -252,7 +254,7 @@ function BlogSection({ blogs, isAdmin }) {
             </div>
             <h3 className="text-xl md:text-2xl font-black mb-3">{blog.title}</h3>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">{blog.content}</p>
-            <div className="text-[11px] text-gray-500 font-black">\u2014 {blog.author}</div>
+            <div className="text-[11px] text-gray-500 font-black">— {blog.author}</div>
           </div>
         ))}
       </div>
@@ -305,3 +307,264 @@ function AudioPlayer({ url, isMe }) {
 function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, setSelectedChatUser }) {
   const [msg, setMsg] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [fileType, setFileType] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const scrollRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (isAdmin && !selectedChatUser) return;
+    const targetUid = isAdmin ? selectedChatUser.uid : user.uid;
+    const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'chats'), (snapshot) => {
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMessages(all.filter(m => m.channelId === targetUid).sort((a,b) => a.ts - b.ts));
+    });
+    return () => unsub();
+  }, [selectedChatUser, isAdmin, user]);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const uploadToCloudinary = async (file, type = 'image') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    let resourceType = 'image';
+    if (type === 'audio' || type === 'video') resourceType = 'video';
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+    return data.secure_url;
+  };
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setSelectedFile(f);
+    const type = f.type.startsWith('video/') ? 'video' : 'image';
+    setFileType(type);
+    setPreviewUrl(URL.createObjectURL(f));
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setIsUploading(true);
+        const targetUid = isAdmin ? selectedChatUser.uid : user.uid;
+        const url = await uploadToCloudinary(audioBlob, 'audio');
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats'), {
+          text: '', file: url, fileType: 'audio', uid: user.uid, name, channelId: targetUid, ts: Date.now()
+        });
+        setIsUploading(false);
+      };
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => setRecordingDuration(d => d + 1), 1000);
+    } catch (err) { console.error(err); }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+    }
+  };
+
+  const send = async (e) => {
+    e?.preventDefault();
+    if (!msg.trim() && !selectedFile) return;
+    const targetUid = isAdmin ? selectedChatUser.uid : user.uid;
+    setIsUploading(true);
+    try {
+      let fileUrl = null;
+      let resolvedFileType = null;
+      if (selectedFile) {
+        resolvedFileType = fileType;
+        fileUrl = await uploadToCloudinary(selectedFile, fileType);
+      }
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats'), {
+        text: msg, file: fileUrl, fileType: resolvedFileType, uid: user.uid, name, channelId: targetUid, ts: Date.now()
+      });
+      setMsg(""); setSelectedFile(null); setPreviewUrl(null); setFileType(null);
+    } catch (err) { console.error(err); }
+    finally { setIsUploading(false); }
+  };
+
+  if (isAdmin && !selectedChatUser) {
+    return (
+      <div className="space-y-3 flex-1 overflow-y-auto pb-4">
+        {registry.map(s => (
+          <button key={s.id} onClick={() => setSelectedChatUser({ ...s, uid: s.admId })} className="w-full bg-[#111] p-5 rounded-3xl border border-white/5 flex justify-between items-center active:bg-white/5 transition-colors"><span className="font-bold">{s.name}</span><ArrowRight size={18} className="text-[#d4af37]" /></button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col flex-1 bg-[#111] rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl relative">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        {messages.map(m => (
+          <div key={m.id} className={`flex ${m.uid === user.uid ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-4 rounded-3xl shadow-lg ${m.uid === user.uid ? 'bg-[#d4af37] text-black rounded-tr-none' : 'bg-white/10 rounded-tl-none'}`}>
+              <p className="text-[9px] font-black uppercase opacity-60 mb-1">{m.name}</p>
+              {m.text && <p className="text-sm font-medium">{m.text}</p>}
+              {m.file && m.fileType === 'image' && (
+                <img src={m.file} alt="attachment" className="mt-2 rounded-2xl max-w-[220px] max-h-[220px] object-cover" />
+              )}
+              {m.file && m.fileType === 'video' && (
+                <video src={m.file} controls className="mt-2 rounded-2xl max-w-[220px]" />
+              )}
+              {m.file && m.fileType === 'audio' && (
+                <div className="mt-2"><AudioPlayer url={m.file} isMe={m.uid === user.uid} /></div>
+              )}
+              {m.file && !m.fileType && (
+                <a href={m.file} target="_blank" className="mt-2 flex items-center gap-1 underline text-[10px] font-bold"><FileText size={10} /> View Attachment</a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-3 md:p-4 bg-black/60 backdrop-blur-md border-t border-white/5 flex flex-col gap-2">
+        <div className="flex items-end gap-2">
+          <div className="flex-1 bg-black/50 border border-white/10 rounded-3xl flex items-end p-1.5">
+            {!isRecording ? (
+              <>
+                <div className="flex items-center">
+                  <label className="p-3 text-gray-400 active:text-[#d4af37] cursor-pointer">
+                    <ImageIcon size={22} />
+                    <input type="file" className="hidden" accept="image/*" ref={imageInputRef} onChange={handleFileChange} />
+                  </label>
+                  <label className="p-3 text-gray-400 active:text-[#d4af37] cursor-pointer">
+                    <Video size={22} />
+                    <input type="file" className="hidden" accept="video/*" ref={videoInputRef} onChange={handleFileChange} />
+                  </label>
+                </div>
+                <textarea
+                  rows="1"
+                  value={msg}
+                  onChange={(e) => setMsg(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-transparent py-3 px-1 outline-none text-sm text-white resize-none max-h-32"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e); } }}
+                />
+                <button onClick={startRecording} className="p-3 text-gray-400 active:text-[#d4af37]"><Mic size={22} /></button>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-between px-4 py-3 text-[#d4af37]">
+                <div className="flex items-center gap-3 animate-pulse">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="text-sm font-black uppercase tracking-widest">Recording {recordingDuration}s</span>
+                </div>
+                <button onClick={stopRecording} className="w-10 h-10 flex items-center justify-center bg-red-500 text-white rounded-2xl shadow-lg active:scale-90"><Square size={18} fill="currentColor" /></button>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={send}
+            disabled={isUploading || (!msg.trim() && !selectedFile)}
+            className="w-14 h-14 bg-[#d4af37] text-black rounded-3xl flex items-center justify-center shadow-lg active:scale-90 disabled:opacity-30 transition-all shrink-0"
+          >
+            {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
+          </button>
+        </div>
+
+        {previewUrl && (
+          <div className="relative w-28 h-28 self-start mt-1 bg-black rounded-2xl overflow-hidden border-2 border-[#d4af37] shadow-2xl">
+            {fileType === 'video' ? (
+              <video src={previewUrl} className="w-full h-full object-cover opacity-60" />
+            ) : (
+              <img src={previewUrl} className="w-full h-full object-cover" />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {fileType === 'video' && <Film size={24} className="text-white opacity-80" />}
+            </div>
+            <button onClick={() => { setSelectedFile(null); setPreviewUrl(null); setFileType(null); }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg z-10"><X size={14} /></button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddHighlightForm() {
+  const [isUploading, setIsUploading] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handleMediaUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadToFileServer(files[0]);
+      setMediaUrl(url);
+    } catch (err) { console.error(err); } finally { setIsUploading(false); }
+  };
+
+  const post = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const finalUrl = mediaUrl || fd.get('url');
+    if (!finalUrl) return;
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'highlights'), { title: fd.get('title'), description: fd.get('desc'), mediaUrl: finalUrl, createdAt: serverTimestamp() });
+    setMediaUrl(""); e.target.reset();
+  };
+
+  return (
+    <form onSubmit={post} className="mt-12 bg-[#111] p-6 md:p-8 rounded-[2.5rem] border border-[#d4af37]/30 space-y-4">
+      <div onClick={() => fileInputRef.current.click()} className="w-full h-32 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-black/40 overflow-hidden relative">
+        {isUploading ? <Loader2 className="animate-spin text-[#d4af37]" /> : mediaUrl ? <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" /> : <Upload className="text-gray-500" />}
+      </div>
+      <input ref={fileInputRef} type="file" className="hidden" onChange={handleMediaUpload} />
+      <input name="title" placeholder="Event Name" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+      <textarea name="desc" placeholder="Context..." required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm resize-none outline-none focus:border-[#d4af37]" />
+      <button className="w-full bg-[#d4af37] text-black font-black p-4 rounded-2xl" disabled={isUploading}>Deploy Media</button>
+    </form>
+  );
+}
+
+function AdminDashboard({ registry }) {
+  const register = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registry'), { name: f.get('name'), admId: f.get('admId'), pos: f.get('pos'), ts: serverTimestamp() });
+    e.target.reset();
+  };
+  return (
+    <div className="space-y-8">
+      <form onSubmit={register} className="bg-[#111] p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
+        <input name="name" placeholder="Full Identity" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+        <input name="admId" placeholder="Admission ID" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+        <input name="pos" placeholder="Position" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+        <button className="w-full bg-[#d4af37] text-black font-black p-4 rounded-2xl">Register</button>
+      </form>
+      <div className="space-y-3">
+        {registry.map(s => (
+          <div key={s.id} className="bg-[#111] p-5 rounded-3xl flex justify-between items-center border border-white/5">
+            <div><p className="font-black text-lg">{s.name}</p><p className="text-[10px] text-gray-500 font-bold uppercase">{s.admId}</p></div>
+            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'registry', s.id))} className="text-red-500 p-3 bg-red-500/10 rounded-xl"><Trash2 size={18}/></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
