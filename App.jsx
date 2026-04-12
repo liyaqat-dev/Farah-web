@@ -145,6 +145,28 @@ export default function App() {
     setCurrentPage('home');
     setDrawerOpen(false);
   };
+    const handleGuestLogin = () => {
+    // 1. Set Session
+    localStorage.setItem('farah_name', 'Guest User');
+    localStorage.setItem('farah_admId', 'GUEST');
+    localStorage.setItem('farah_isAdmin', 'false');
+    
+    // 2. Trigger Celebration
+    if (window.confetti) {
+      window.confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#d4af37', '#ffffff', '#aa841e']
+      });
+    }
+    
+    // 3. Authenticate and Alert
+    setIsAuthenticated(true);
+    setIsAdmin(false);
+    setRegisteredName("Guest User");
+    alert("Farah welcomes you!");
+  };
 
   const navigate = (page) => {
     setCurrentPage(page);
@@ -169,7 +191,17 @@ export default function App() {
             <input name="admId" type="password" placeholder="Admission Number" required className="w-full bg-black border border-white/10 rounded-2xl p-4 outline-none focus:border-[#d4af37] text-sm" />
             {loginError && <p className="text-red-500 text-[10px] font-bold text-center uppercase">{loginError}</p>}
             <button className="w-full bg-[#d4af37] text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2">Authorize <Lock size={16} /></button>
-          </form>
+                        <button className="w-full bg-[#d4af37] text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2">Authorize <Lock size={16} /></button>
+            
+            {/* --- ADD GUEST BUTTON HERE --- */}
+            <button 
+              type="button"
+              onClick={handleGuestLogin}
+              className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 active:bg-white/10 transition-colors"
+            >
+              Continue as Guest
+            </button>
+            </form>
         </div>
       </div>
     );
