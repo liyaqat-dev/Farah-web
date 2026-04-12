@@ -55,14 +55,17 @@ const uploadToFileServer = async (fileInput) => {
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   let resourceType = "auto";
 if (fileToUpload.type && fileToUpload.type.startsWith("image/")) resourceType = "image";
-else if (fileToUpload.type && fileToUpload.type.startsWith("video/")) resourceType = "video";
-
+// Wrap the logic in braces to ensure the parser treats 'const' as a new statement
+if (fileToUpload.type && fileToUpload.type.startsWith("image/")) {
+  resourceType = "image";
+} else if (fileToUpload.type && fileToUpload.type.startsWith("video/")) {
+  resourceType = "video";
+}
 const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { 
   method: 'POST', 
   body: formData 
 });
-
-  const data = await response.json();
+const data = await response.json();
   return data.secure_url;
 };
 
