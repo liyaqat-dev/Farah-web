@@ -165,7 +165,7 @@ export default function App() {
     setIsAuthenticated(true);
     setIsAdmin(false);
     setRegisteredName("Guest User");
-    alert("Farah welcomes you!");
+    alert("بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ");
   };
 
   const navigate = (page) => {
