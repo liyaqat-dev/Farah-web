@@ -1,4 +1,3 @@
-```react
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -48,24 +47,16 @@ const ADMIN_ADM_ID = "0000";
 
 // --- Global Helpers ---
 const uploadToFileServer = async (fileInput) => {
-  const fileToUpload = fileInput instanceof FileList ? fileInput : fileInput;
+  const fileToUpload = fileInput instanceof FileList ? fileInput[0] : fileInput;
   if (!fileToUpload) throw new Error("No file selected");
   const formData = new FormData();
   formData.append('file', fileToUpload);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   let resourceType = "auto";
-if (fileToUpload.type && fileToUpload.type.startsWith("image/")) resourceType = "image";
-// Wrap the logic in braces to ensure the parser treats 'const' as a new statement
-if (fileToUpload.type && fileToUpload.type.startsWith("image/")) {
-  resourceType = "image";
-} else if (fileToUpload.type && fileToUpload.type.startsWith("video/")) {
-  resourceType = "video";
-}
-const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { 
-  method: 'POST', 
-  body: formData 
-});
-const data = await response.json();
+  if (fileToUpload.type && fileToUpload.type.startsWith("image/")) resourceType = "image";
+  else if (fileToUpload.type && fileToUpload.type.startsWith("video/")) resourceType = "video";
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { method: 'POST', body: formData });
+  const data = await response.json();
   return data.secure_url;
 };
 
@@ -82,18 +73,15 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [selectedChatUser, setSelectedChatUser] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
 
   // --- One-Time Login: restore session from localStorage ---
   useEffect(() => {
     const savedName = localStorage.getItem('farah_name');
     const savedAdmId = localStorage.getItem('farah_admId');
     const savedIsAdmin = localStorage.getItem('farah_isAdmin');
-    const savedIsGuest = localStorage.getItem('farah_isGuest');
     if (savedName && savedAdmId) {
       setRegisteredName(savedName);
       setIsAdmin(savedIsAdmin === 'true');
-      setIsGuest(savedIsGuest === 'true');
       setIsAuthenticated(true);
     }
   }, []);
@@ -136,8 +124,6 @@ export default function App() {
       localStorage.setItem('farah_name', 'Administrator');
       localStorage.setItem('farah_admId', admId);
       localStorage.setItem('farah_isAdmin', 'true');
-      localStorage.removeItem('farah_isGuest');
-      setIsGuest(false);
       setIsAuthenticated(true); setIsAdmin(true); setRegisteredName("Administrator"); return;
     }
     const match = registry.find(s => s.name.toLowerCase() === name.toLowerCase() && s.admId.toString() === admId.toString());
@@ -145,30 +131,14 @@ export default function App() {
       localStorage.setItem('farah_name', match.name);
       localStorage.setItem('farah_admId', admId);
       localStorage.setItem('farah_isAdmin', 'false');
-      localStorage.removeItem('farah_isGuest');
-      setIsGuest(false);
       setIsAuthenticated(true); setIsAdmin(false); setRegisteredName(match.name); setLoginError("");
     } else { setLoginError("Invalid credentials."); }
-  };
-
-  const handleGuestLogin = () => {
-    localStorage.setItem('farah_name', 'Guest Visitor');
-    localStorage.setItem('farah_admId', 'GUEST');
-    localStorage.setItem('farah_isAdmin', 'false');
-    localStorage.setItem('farah_isGuest', 'true');
-    setRegisteredName('Guest Visitor');
-    setIsAdmin(false);
-    setIsGuest(true);
-    setIsAuthenticated(true);
-    setLoginError("");
   };
 
   const handleLogout = () => {
     localStorage.removeItem('farah_name');
     localStorage.removeItem('farah_admId');
     localStorage.removeItem('farah_isAdmin');
-    localStorage.removeItem('farah_isGuest');
-    setIsGuest(false);
     setIsAuthenticated(false);
     setIsAdmin(false);
     setRegisteredName("");
@@ -198,12 +168,7 @@ export default function App() {
             <input name="name" placeholder="Full Name" required className="w-full bg-black border border-white/10 rounded-2xl p-4 outline-none focus:border-[#d4af37] text-sm" />
             <input name="admId" type="password" placeholder="Admission Number" required className="w-full bg-black border border-white/10 rounded-2xl p-4 outline-none focus:border-[#d4af37] text-sm" />
             {loginError && <p className="text-red-500 text-[10px] font-bold text-center uppercase">{loginError}</p>}
-            <button type="submit" className="w-full bg-[#d4af37] text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2">Authorize <Lock size={16} /></button>
-            <div className="pt-3 border-t border-white/5 mt-2">
-              <button type="button" onClick={handleGuestLogin} className="w-full bg-white/5 text-gray-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:text-white hover:bg-white/10 transition-colors text-xs uppercase tracking-widest">
-                Launch App <Users size={14} />
-              </button>
-            </div>
+            <button className="w-full bg-[#d4af37] text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2">Authorize <Lock size={16} /></button>
           </form>
         </div>
       </div>
@@ -212,7 +177,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col font-sans">
-      {isGuest && currentPage === 'home' && <PartyPopper />}
+
       {/* ===================== HAMBURGER DRAWER ===================== */}
       <AnimatePresence>
         {drawerOpen && (
@@ -311,7 +276,7 @@ export default function App() {
                     {committee.map(m => (
                       <div key={m.id} className="flex items-center gap-4 bg-black/40 rounded-2xl px-5 py-4 border border-white/5">
                         <div className="w-10 h-10 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center shrink-0">
-                          <span className="text-[#d4af37] font-black text-sm">{(m.name || '?').toUpperCase()}</span>
+                          <span className="text-[#d4af37] font-black text-sm">{(m.name || '?')[0].toUpperCase()}</span>
                         </div>
                         <div>
                           <p className="font-black text-sm text-white">{m.name}</p>
@@ -447,7 +412,7 @@ export default function App() {
 
           {/* ---- CHAT ---- */}
           {currentPage === 'messages' && (
-            <motion.div key="messages" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="p-4 md:p-6 max-w-2xl mx-auto h-[calc(100vh-140px)] flex flex-col">
+            <motion.div key="messages" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="p-4 md:p-6 max-w-2xl mx-auto h-[calc(100vh-180px)] flex flex-col">
               <SectionHeader title={isAdmin ? "Direct Messages" : "Consult Admin"} subtitle="Private Communication" icon={<MessageSquare className="text-[#d4af37]" />} />
               <MessagingSection user={user} isAdmin={isAdmin} name={registeredName} registry={registry} selectedChatUser={selectedChatUser} setSelectedChatUser={setSelectedChatUser} />
             </motion.div>
@@ -630,7 +595,7 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
   };
 
   const handleFileChange = (e) => {
-    const f = e.target.files;
+    const f = e.target.files[0];
     if (!f) return;
     setSelectedFile(f);
     const type = f.type.startsWith('video/') ? 'video' : 'image';
@@ -703,7 +668,7 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
   }
 
   return (
-    <div className="flex flex-col flex-1 bg-[#111] rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl relative">
+    <div className="flex flex-col flex-1 bg-[#111] rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl">
       {/* Messages list */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         {messages.map(m => (
@@ -822,7 +787,7 @@ function AddHighlightForm() {
     if (!files || files.length === 0) return;
     setIsUploading(true);
     try {
-      const url = await uploadToFileServer(files);
+      const url = await uploadToFileServer(files[0]);
       setMediaUrl(url);
     } catch (err) { console.error(err); } finally { setIsUploading(false); }
   };
@@ -973,56 +938,3 @@ function AdminDashboard({ registry, committee }) {
     </div>
   );
 }
-
-function PartyPopper() {
-  const [show, setShow] = useState(() => !sessionStorage.getItem('farah_guest_welcomed'));
-
-  useEffect(() => {
-    if (!show) return;
-    sessionStorage.setItem('farah_guest_welcomed', 'true');
-    const timer = setTimeout(() => setShow(false), 4500);
-    return () => clearTimeout(timer);
-  }, [show]);
-
-  if (!show) return null;
-
-  const confetti = Array.from({ length: 60 }).map((_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    delay: Math.random() * 0.5,
-    duration: 1.5 + Math.random() * 2.5,
-    color: ['#d4af37', '#ffffff', '#8a7322', '#ff5e5e', '#5eff8a', '#3498db'][Math.floor(Math.random() * 6)],
-    size: Math.random() * 6 + 4
-  }));
-
-  return (
-    <div className="fixed inset-0 pointer-events-none z- flex items-center justify-center overflow-hidden">
-      {confetti.map(c => (
-        <motion.div
-          key={c.id}
-          initial={{ y: -50, x: `${c.x}vw`, opacity: 1, rotate: 0 }}
-          animate={{ y: '100vh', opacity: 0, rotate: 360 }}
-          transition={{ duration: c.duration, delay: c.delay, ease: "easeOut" }}
-          className="absolute top-0 rounded-sm"
-          style={{ width: c.size, height: c.size, backgroundColor: c.color }}
-        />
-      ))}
-      <motion.div 
-        initial={{ scale: 0, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0, opacity: 0, y: -20 }}
-        className="bg-[#111]/95 backdrop-blur-2xl border border-[#d4af37]/30 p-8 rounded-[3rem] shadow-2xl flex flex-col items-center gap-4 text-center pointer-events-auto mx-6"
-      >
-        <span className="text-6xl animate-bounce drop-shadow-[0_0_20px_rgba(212,175,55,0.5)]">🎉</span>
-        <div>
-          <h2 className="text-3xl font-black text-white italic tracking-tighter">WELCOME GUEST</h2>
-          <p className="text-[10px] text-[#d4af37] font-bold uppercase tracking-[0.3em] mt-1">Enjoy the Farah Portal</p>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-
-```
-
