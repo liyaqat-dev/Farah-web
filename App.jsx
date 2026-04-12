@@ -759,16 +759,6 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
           <div className="flex-1 min-w-0 bg-[#1a1a1a] border border-white/10 rounded-3xl flex items-end">
             {!isRecording ? (
               <>
-                {/* Document button */}
-                <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
-                  <FileText size={21} />
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" 
-                    onChange={handleFileChange} 
-                  />
-                </label>
                 {/* Image button */}
                 <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
                   <ImageIcon size={21} />
