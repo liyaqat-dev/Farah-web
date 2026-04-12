@@ -613,18 +613,26 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const uploadToCloudinary = async (file, type = 'image') => {
+    const uploadToCloudinary = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    let resourceType = 'image';
-    if (type === 'audio' || type === 'video') resourceType = 'video';
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { method: 'POST', body: formData });
+    
+    // Determine Resource Type for Cloudinary
+    let resourceType = 'raw'; // Default for PDF, Word, Excel
+    if (file.type.startsWith('image/')) resourceType = 'image';
+    else if (file.type.startsWith('video/')) resourceType = 'video';
+    else if (file.type.startsWith('audio/')) resourceType = 'video'; // Cloudinary uses 'video' for audio
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, { 
+      method: 'POST', 
+      body: formData 
+    });
     const data = await res.json();
     return data.secure_url;
   };
 
-  const handleFileChange = (e) => {
+ const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
     setSelectedFile(f);
@@ -751,6 +759,16 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
           <div className="flex-1 min-w-0 bg-[#1a1a1a] border border-white/10 rounded-3xl flex items-end">
             {!isRecording ? (
               <>
+                {/* Document button */}
+                <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
+                  <FileText size={21} />
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" 
+                    onChange={handleFileChange} 
+                  />
+                </label>
                 {/* Image button */}
                 <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
                   <ImageIcon size={21} />
