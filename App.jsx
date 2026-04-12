@@ -309,7 +309,7 @@ export default function App() {
                   </div>
                   <div>
                     <p className="font-black text-[#d4af37] text-lg uppercase italic tracking-tight">FARAH</p>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">15th Batch \u00b7 NRIC</p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">15th Batch · NRIC</p>
                   </div>
                 </div>
                 <p className="text-gray-300 text-sm leading-relaxed">
@@ -319,7 +319,7 @@ export default function App() {
                   As a dynamic student body, FARAH plays a central role in organizing academic, cultural, and extracurricular initiatives within the college. It provides a platform for students to nurture their talents, express their ideas, and actively contribute to the growth of the institution. Through its diverse programs, publications, and events, FARAH cultivates collaboration, discipline, and innovation.
                 </p>
                 <p className="text-gray-400 text-sm leading-relaxed">
-                  Guided by its name\u2014Friends Association for Reformative and Academic Hopes\u2014the union emphasizes both moral development (reformative values) and educational aspiration (academic excellence). It reflects a collective vision of progress, responsibility, and purposeful learning.
+                  Guided by its name—Friends Association for Reformative and Academic Hopes—the union emphasizes both moral development (reformative values) and educational aspiration (academic excellence). It reflects a collective vision of progress, responsibility, and purposeful learning.
                 </p>
                 <p className="text-gray-400 text-sm leading-relaxed">
                   Rooted in the vision and values of NRIC, FARAH strives to shape well-rounded individuals who contribute positively to society. More than just a batch identity, it stands as a purposeful movement driven by brotherhood, intellectual growth, and a shared commitment to excellence.
@@ -510,7 +510,7 @@ function BlogSection({ blogs, isAdmin }) {
             </div>
             <h3 className="text-xl md:text-2xl font-black mb-3">{blog.title}</h3>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">{blog.content}</p>
-            <div className="text-[11px] text-gray-500 font-black">\u2014 {blog.author}</div>
+            <div className="text-[11px] text-gray-500 font-black">— {blog.author}</div>
           </div>
         ))}
       </div>
@@ -698,4 +698,244 @@ function MessagingSection({ user, isAdmin, name, registry, selectedChatUser, set
 
         {/* File preview thumbnail */}
         {previewUrl && (
-          <div className="relative
+          <div className="relative w-24 h-24 mb-2 bg-black rounded-2xl overflow-hidden border-2 border-[#d4af37] shadow-xl">
+            {fileType === 'video' ? (
+              <video src={previewUrl} className="w-full h-full object-cover opacity-60" />
+            ) : (
+              <img src={previewUrl} className="w-full h-full object-cover" />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {fileType === 'video' && <Film size={20} className="text-white opacity-80" />}
+            </div>
+            <button
+              onClick={() => { setSelectedFile(null); setPreviewUrl(null); setFileType(null); }}
+              className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1 shadow-lg z-10"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          {/* Input bubble with image/video pickers and text */}
+          <div className="flex-1 min-w-0 bg-[#1a1a1a] border border-white/10 rounded-3xl flex items-end">
+            {!isRecording ? (
+              <>
+                {/* Image button */}
+                <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
+                  <ImageIcon size={21} />
+                  <input type="file" className="hidden" accept="image/*" ref={imageInputRef} onChange={handleFileChange} />
+                </label>
+                {/* Video button */}
+                <label className="shrink-0 p-3 text-gray-300 active:text-[#d4af37] cursor-pointer">
+                  <Video size={21} />
+                  <input type="file" className="hidden" accept="video/*" ref={videoInputRef} onChange={handleFileChange} />
+                </label>
+                {/* Text input */}
+                <textarea
+                  rows="1"
+                  value={msg}
+                  onChange={(e) => setMsg(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 min-w-0 bg-transparent py-3 px-1 outline-none text-sm text-white resize-none max-h-28"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e); } }}
+                />
+                {/* Mic button — gold so always visible */}
+                <button
+                  onClick={startRecording}
+                  className="shrink-0 p-3 text-[#d4af37] active:scale-90 transition-transform"
+                >
+                  <Mic size={21} />
+                </button>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-between px-4 py-3 text-[#d4af37]">
+                <div className="flex items-center gap-3 animate-pulse">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="text-sm font-black uppercase tracking-widest">Recording {recordingDuration}s</span>
+                </div>
+                <button onClick={stopRecording} className="shrink-0 w-10 h-10 flex items-center justify-center bg-red-500 text-white rounded-2xl shadow-lg active:scale-90">
+                  <Square size={18} fill="currentColor" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Send button — always gold, always full opacity */}
+          <button
+            onClick={send}
+            disabled={isUploading}
+            className="shrink-0 w-12 h-12 bg-[#d4af37] text-black rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+          >
+            {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===================== ADD HIGHLIGHT FORM =====================
+
+function AddHighlightForm() {
+  const [isUploading, setIsUploading] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handleMediaUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadToFileServer(files[0]);
+      setMediaUrl(url);
+    } catch (err) { console.error(err); } finally { setIsUploading(false); }
+  };
+
+  const post = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const finalUrl = mediaUrl || fd.get('url');
+    if (!finalUrl) return;
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'highlights'), {
+      title: fd.get('title'), description: fd.get('desc'), mediaUrl: finalUrl, createdAt: serverTimestamp()
+    });
+    setMediaUrl(""); e.target.reset();
+  };
+
+  return (
+    <form onSubmit={post} className="mt-12 bg-[#111] p-6 md:p-8 rounded-[2.5rem] border border-[#d4af37]/30 space-y-4">
+      <div onClick={() => fileInputRef.current.click()} className="w-full h-32 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-black/40 overflow-hidden relative">
+        {isUploading ? <Loader2 className="animate-spin text-[#d4af37]" /> : mediaUrl ? <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" /> : <Upload className="text-gray-500" />}
+      </div>
+      <input ref={fileInputRef} type="file" className="hidden" onChange={handleMediaUpload} />
+      <input name="title" placeholder="Event Name" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+      <textarea name="desc" placeholder="Context..." required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm resize-none outline-none focus:border-[#d4af37]" />
+      <button className="w-full bg-[#d4af37] text-black font-black p-4 rounded-2xl" disabled={isUploading}>Deploy Media</button>
+    </form>
+  );
+}
+
+// ===================== ADMIN DASHBOARD =====================
+
+function AdminDashboard({ registry, committee }) {
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editPos, setEditPos] = useState("");
+  const [activeTab, setActiveTab] = useState('students');
+
+  const register = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registry'), {
+      name: f.get('name'), admId: f.get('admId'), pos: f.get('pos'), ts: serverTimestamp()
+    });
+    e.target.reset();
+  };
+
+  const savePosition = async (id) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'registry', id), { pos: editPos });
+    setEditingStudent(null);
+    setEditPos("");
+  };
+
+  const addCommitteeMember = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'committee'), {
+      name: f.get('cname'), position: f.get('cpos'), ts: serverTimestamp()
+    });
+    e.target.reset();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Tab switcher */}
+      <div className="flex gap-2 bg-[#111] p-1.5 rounded-2xl border border-white/5">
+        {['students', 'committee'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-[#d4af37] text-black' : 'text-gray-500'}`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* ---- STUDENTS TAB ---- */}
+      {activeTab === 'students' && (
+        <div className="space-y-6">
+          <form onSubmit={register} className="bg-[#111] p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Register Student</p>
+            <input name="name" placeholder="Full Identity" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+            <input name="admId" placeholder="Admission ID" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+            <input name="pos" placeholder="Position" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+            <button className="w-full bg-[#d4af37] text-black font-black p-4 rounded-2xl">Register</button>
+          </form>
+
+          <div className="space-y-3">
+            {registry.map(s => (
+              <div key={s.id} className="bg-[#111] p-5 rounded-3xl border border-white/5">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="font-black text-lg">{s.name}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase">{s.admId}</p>
+                    {editingStudent === s.id ? (
+                      <div className="flex gap-2 mt-3">
+                        <input
+                          value={editPos}
+                          onChange={(e) => setEditPos(e.target.value)}
+                          placeholder="New position..."
+                          className="flex-1 min-w-0 bg-black border border-[#d4af37]/50 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#d4af37]"
+                        />
+                        <button onClick={() => savePosition(s.id)} className="bg-[#d4af37] text-black px-3 py-2 rounded-xl shrink-0"><Check size={14} /></button>
+                        <button onClick={() => setEditingStudent(null)} className="bg-white/5 text-gray-400 px-3 py-2 rounded-xl shrink-0"><X size={14} /></button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[#d4af37] font-bold mt-1">{s.pos}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => { setEditingStudent(s.id); setEditPos(s.pos || ""); }} className="text-[#d4af37] p-2.5 bg-[#d4af37]/10 rounded-xl active:scale-90">
+                      <Pencil size={15}/>
+                    </button>
+                    <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'registry', s.id))} className="text-red-500 p-2.5 bg-red-500/10 rounded-xl active:scale-90">
+                      <Trash2 size={15}/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- COMMITTEE TAB ---- */}
+      {activeTab === 'committee' && (
+        <div className="space-y-6">
+          <form onSubmit={addCommitteeMember} className="bg-[#111] p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Add Committee Member</p>
+            <input name="cname" placeholder="Full Name" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+            <input name="cpos" placeholder="Position / Role" required className="w-full bg-black border border-white/10 p-4 rounded-2xl text-sm outline-none focus:border-[#d4af37]" />
+            <button className="w-full bg-[#d4af37] text-black font-black p-4 rounded-2xl">Add Member</button>
+          </form>
+
+          <div className="space-y-3">
+            {committee.map(m => (
+              <div key={m.id} className="bg-[#111] p-5 rounded-3xl flex justify-between items-center border border-white/5">
+                <div>
+                  <p className="font-black text-base">{m.name}</p>
+                  <p className="text-[10px] text-[#d4af37] font-bold uppercase">{m.position}</p>
+                </div>
+                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'committee', m.id))} className="text-red-500 p-2.5 bg-red-500/10 rounded-xl active:scale-90">
+                  <Trash2 size={15}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
