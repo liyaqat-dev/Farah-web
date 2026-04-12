@@ -35,7 +35,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'farah-portal-v2';
-const LOGO_URL = "image-removebg-preview.png";
+const LOGO_URL = "https://res.cloudinary.com/dgf5rdk10/image/upload/v1775534830/image-removebg-preview_yupixf.svg";
 
 // --- Cloudinary Integration ---
 const CLOUDINARY_CLOUD_NAME = "dgf5rdk10";
